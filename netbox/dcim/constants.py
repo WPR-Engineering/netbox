@@ -123,6 +123,10 @@ IFACE_FF_SUMMITSTACK128 = 5310
 IFACE_FF_SUMMITSTACK256 = 5320
 IFACE_FF_SUMMITSTACK512 = 5330
 
+# Audio
+
+IFACE_FF_ANALOGAUDIO = 6000
+
 # Other
 IFACE_FF_OTHER = 32767
 
@@ -219,6 +223,12 @@ IFACE_FF_CHOICES = [
             [IFACE_FF_SUMMITSTACK128, 'Extreme SummitStack-128'],
             [IFACE_FF_SUMMITSTACK256, 'Extreme SummitStack-256'],
             [IFACE_FF_SUMMITSTACK512, 'Extreme SummitStack-512'],
+        ]
+    ],
+    [
+        'Audio',
+        [
+            [IFACE_FF_ANALOGAUDIO, 'Analog Audio'],
         ]
     ],
     [
