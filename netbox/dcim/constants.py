@@ -126,6 +126,15 @@ IFACE_FF_SUMMITSTACK512 = 5330
 # Audio
 
 IFACE_FF_ANALOGAUDIO = 6000
+IFACE_FF_AESAUDIO = 6100
+IFACE_FF_MICROPHONE = 6200
+
+# GPIO
+
+IFACE_FF_GPIO_INPUT = 6500
+IFACE_FF_GPIO_OUTPUT = 6600
+IFACE_FF_GPIO_VIRTUAL = 6700
+IFACE_FF_GPIO = 6800
 
 # Other
 IFACE_FF_OTHER = 32767
@@ -229,6 +238,17 @@ IFACE_FF_CHOICES = [
         'Audio',
         [
             [IFACE_FF_ANALOGAUDIO, 'Analog Audio'],
+            [IFACE_FF_AESAUDIO, 'AES/EUB'],
+            [IFACE_FF_MICROPHONE, 'Microphone'],
+        ]
+    ],
+    [
+        'GPIO',
+        [
+            [IFACE_FF_GPIO_INPUT, 'GPIO - Input'],
+            [IFACE_FF_GPIO_OUTPUT, 'GPIO - Output'],
+            [IFACE_FF_GPIO_VIRTUAL, 'GPIO - Virtual'],
+            [IFACE_FF_GPIO, 'GPIO'],
         ]
     ],
     [
@@ -265,6 +285,9 @@ IFACE_MODE_CHOICES = [
 
 # Pass-through port types
 PORT_TYPE_8P8C = 1000
+PORT_TYPE_110PUNCH = 1100
+PORT_TYPE_SLPUNCH = 1200
+PORT_TYPE_66PUNCH = 1300
 PORT_TYPE_ST = 2000
 PORT_TYPE_SC = 2100
 PORT_TYPE_FC = 2200
@@ -276,7 +299,10 @@ PORT_TYPE_CHOICES = [
     [
         'Copper',
         [
-            [PORT_TYPE_8P8C, '8P8C'],
+            [PORT_TYPE_8P8C, '8P8C (RJ45)'],
+            [PORT_TYPE_110PUNCH, '110 Block Style - Punch'],
+            [PORT_TYPE_SLPUNCH, 'SL Modular Jack'],
+            [PORT_TYPE_66PUNCH, '66 Block Style - Punch'],
         ],
     ],
     [
