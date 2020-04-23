@@ -18,3 +18,4 @@ netbox.pid
 .idea
 .coverage
 .vscode
+/venv/*
