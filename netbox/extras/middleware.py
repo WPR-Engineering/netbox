@@ -1,44 +1,64 @@
 import random
 import threading
 import uuid
+from copy import deepcopy
 from datetime import timedelta
 
 from django.conf import settings
-from django.db.models.signals import post_delete, post_save
+from django.contrib import messages
+from django.db.models.signals import pre_delete, post_save
 from django.utils import timezone
-from django.utils.functional import curry
 from django_prometheus.models import model_deletes, model_inserts, model_updates
+from redis.exceptions import RedisError
 
-from extras.webhooks import enqueue_webhooks
-from .constants import (
-    OBJECTCHANGE_ACTION_CREATE, OBJECTCHANGE_ACTION_DELETE, OBJECTCHANGE_ACTION_UPDATE,
-)
+from extras.utils import is_taggable
+from utilities.api import is_api_request
+from utilities.querysets import DummyQuerySet
+from .choices import ObjectChangeActionChoices
 from .models import ObjectChange
+from .signals import purge_changelog
+from .webhooks import enqueue_webhooks
 
 _thread_locals = threading.local()
 
 
-def cache_changed_object(instance, **kwargs):
-
-    action = OBJECTCHANGE_ACTION_CREATE if kwargs['created'] else OBJECTCHANGE_ACTION_UPDATE
-
-    # Cache the object for further processing was the response has completed.
+def handle_changed_object(sender, instance, **kwargs):
+    """
+    Fires when an object is created or updated.
+    """
+    # Queue the object for processing once the request completes
+    action = ObjectChangeActionChoices.ACTION_CREATE if kwargs['created'] else ObjectChangeActionChoices.ACTION_UPDATE
     _thread_locals.changed_objects.append(
         (instance, action)
     )
 
 
-def _record_object_deleted(request, instance, **kwargs):
+def handle_deleted_object(sender, instance, **kwargs):
+    """
+    Fires when an object is deleted.
+    """
+    # Cache custom fields prior to copying the instance
+    if hasattr(instance, 'cache_custom_fields'):
+        instance.cache_custom_fields()
 
-    # Record that the object was deleted
-    if hasattr(instance, 'log_change'):
-        instance.log_change(request.user, request.id, OBJECTCHANGE_ACTION_DELETE)
+    # Create a copy of the object being deleted
+    copy = deepcopy(instance)
 
-    # Enqueue webhooks
-    enqueue_webhooks(instance, request.user, request.id, OBJECTCHANGE_ACTION_DELETE)
+    # Preserve tags
+    if is_taggable(instance):
+        copy.tags = DummyQuerySet(instance.tags.all())
 
-    # Increment metric counters
-    model_deletes.labels(instance._meta.model_name).inc()
+    # Queue the copy of the object for processing once the request completes
+    _thread_locals.changed_objects.append(
+        (copy, ObjectChangeActionChoices.ACTION_DELETE)
+    )
+
+
+def purge_objectchange_cache(sender, **kwargs):
+    """
+    Delete any queued object changes waiting to be written.
+    """
+    _thread_locals.changed_objects = []
 
 
 class ObjectChangeMiddleware(object):
@@ -47,7 +67,7 @@ class ObjectChangeMiddleware(object):
 
         1. Create an ObjectChange to reflect the modification to the object in the changelog.
         2. Enqueue any relevant webhooks.
-        3. Increment metric counter for the event type
+        3. Increment the metric counter for the event type.
 
     The post_save and post_delete signals are employed to catch object modifications, however changes are recorded a bit
     differently for each. Objects being saved are cached into thread-local storage for action *after* the response has
@@ -67,34 +87,63 @@ class ObjectChangeMiddleware(object):
         # the same request.
         request.id = uuid.uuid4()
 
-        # Signals don't include the request context, so we're currying it into the post_delete function ahead of time.
-        record_object_deleted = curry(_record_object_deleted, request)
-
         # Connect our receivers to the post_save and post_delete signals.
-        post_save.connect(cache_changed_object, dispatch_uid='record_object_saved')
-        post_delete.connect(record_object_deleted, dispatch_uid='record_object_deleted')
+        post_save.connect(handle_changed_object, dispatch_uid='handle_changed_object')
+        pre_delete.connect(handle_deleted_object, dispatch_uid='handle_deleted_object')
+
+        # Provide a hook for purging the change cache
+        purge_changelog.connect(purge_objectchange_cache)
 
         # Process the request
         response = self.get_response(request)
 
-        # Create records for any cached objects that were created/updated.
-        for obj, action in _thread_locals.changed_objects:
+        # If the change cache is empty, there's nothing more we need to do.
+        if not _thread_locals.changed_objects:
+            return response
 
-            # Record the change
-            if hasattr(obj, 'log_change'):
-                obj.log_change(request.user, request.id, action)
+        # Disconnect our receivers from the post_save and post_delete signals.
+        post_save.disconnect(handle_changed_object, dispatch_uid='handle_changed_object')
+        pre_delete.disconnect(handle_deleted_object, dispatch_uid='handle_deleted_object')
+
+        # Create records for any cached objects that were changed.
+        redis_failed = False
+        for instance, action in _thread_locals.changed_objects:
+
+            # Refresh cached custom field values
+            if action in [ObjectChangeActionChoices.ACTION_CREATE, ObjectChangeActionChoices.ACTION_UPDATE]:
+                if hasattr(instance, 'cache_custom_fields'):
+                    instance.cache_custom_fields()
+
+            # Record an ObjectChange if applicable
+            if hasattr(instance, 'to_objectchange'):
+                objectchange = instance.to_objectchange(action)
+                objectchange.user = request.user
+                objectchange.request_id = request.id
+                objectchange.save()
 
             # Enqueue webhooks
-            enqueue_webhooks(obj, request.user, request.id, action)
+            try:
+                enqueue_webhooks(instance, request.user, request.id, action)
+            except RedisError as e:
+                if not redis_failed and not is_api_request(request):
+                    messages.error(
+                        request,
+                        "There was an error processing webhooks for this request. Check that the Redis service is "
+                        "running and reachable. The full error details were: {}".format(e)
+                    )
+                    redis_failed = True
 
             # Increment metric counters
-            if action == OBJECTCHANGE_ACTION_CREATE:
-                model_inserts.labels(obj._meta.model_name).inc()
-            elif action == OBJECTCHANGE_ACTION_UPDATE:
-                model_updates.labels(obj._meta.model_name).inc()
+            if action == ObjectChangeActionChoices.ACTION_CREATE:
+                model_inserts.labels(instance._meta.model_name).inc()
+            elif action == ObjectChangeActionChoices.ACTION_UPDATE:
+                model_updates.labels(instance._meta.model_name).inc()
+            elif action == ObjectChangeActionChoices.ACTION_DELETE:
+                model_deletes.labels(instance._meta.model_name).inc()
 
-        # Housekeeping: 1% chance of clearing out expired ObjectChanges
-        if _thread_locals.changed_objects and settings.CHANGELOG_RETENTION and random.randint(1, 100) == 1:
+        # Housekeeping: 1% chance of clearing out expired ObjectChanges. This applies only to requests which result in
+        # one or more changes being logged.
+        if settings.CHANGELOG_RETENTION and random.randint(1, 100) == 1:
             cutoff = timezone.now() - timedelta(days=settings.CHANGELOG_RETENTION)
             purged_count, _ = ObjectChange.objects.filter(
                 time__lt=cutoff

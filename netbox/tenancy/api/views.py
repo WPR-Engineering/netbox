@@ -4,18 +4,10 @@ from extras.api.views import CustomFieldModelViewSet
 from ipam.models import IPAddress, Prefix, VLAN, VRF
 from tenancy import filters
 from tenancy.models import Tenant, TenantGroup
-from utilities.api import FieldChoicesViewSet, ModelViewSet
+from utilities.api import ModelViewSet
 from utilities.utils import get_subquery
 from virtualization.models import VirtualMachine
 from . import serializers
-
-
-#
-# Field choices
-#
-
-class TenancyFieldChoicesViewSet(FieldChoicesViewSet):
-    fields = ()
 
 
 #
@@ -27,7 +19,7 @@ class TenantGroupViewSet(ModelViewSet):
         tenant_count=get_subquery(Tenant, 'group')
     )
     serializer_class = serializers.TenantGroupSerializer
-    filterset_class = filters.TenantGroupFilter
+    filterset_class = filters.TenantGroupFilterSet
 
 
 #
@@ -35,10 +27,8 @@ class TenantGroupViewSet(ModelViewSet):
 #
 
 class TenantViewSet(CustomFieldModelViewSet):
-    queryset = Tenant.objects.select_related(
-        'group'
-    ).prefetch_related(
-        'tags'
+    queryset = Tenant.objects.prefetch_related(
+        'group', 'tags'
     ).annotate(
         circuit_count=get_subquery(Circuit, 'tenant'),
         device_count=get_subquery(Device, 'tenant'),
@@ -51,4 +41,4 @@ class TenantViewSet(CustomFieldModelViewSet):
         vrf_count=get_subquery(VRF, 'tenant')
     )
     serializer_class = serializers.TenantSerializer
-    filterset_class = filters.TenantFilter
+    filterset_class = filters.TenantFilterSet
