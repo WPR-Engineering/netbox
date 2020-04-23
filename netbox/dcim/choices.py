@@ -602,6 +602,18 @@ class InterfaceTypeChoices(ChoiceSet):
     TYPE_SUMMITSTACK256 = 'extreme-summitstack-256'
     TYPE_SUMMITSTACK512 = 'extreme-summitstack-512'
 
+    # Audio
+    TYPE_ANALOGAUDIO = 'Analog Audio'
+    TYPE_AESAUDIO = 'AES/EBU'
+    TYPE_MICROPHONE = 'Microphone'
+
+    #GPIO
+    TYPE_GPIO_INPUT = 'GPIO - Input'
+    TYPE_GPIO_OUTPUT = 'GPIO - Ouput'
+    TYPE_GPIO_VIRTUAL = 'GPIO - Vritual'
+    TYPE_GPIO = 'GPIO'
+
+
     # Other
     TYPE_OTHER = 'other'
 
@@ -733,6 +745,23 @@ class InterfaceTypeChoices(ChoiceSet):
                 (TYPE_OTHER, 'Other'),
             )
         ),
+        (
+            'Audio',
+            (
+                (TYPE_ANALOGAUDIO, 'Analog Audio'),
+                (TYPE_AESAUDIO, 'AES/EBU'),
+                (TYPE_MICROPHONE, 'Microphone'),
+            )
+        ),
+        (
+            'GPIO',
+            (
+                (TYPE_GPIO_INPUT, 'GPIO - Input'),
+                (TYPE_GPIO_OUTPUT, 'GPIO - Output'),
+                (TYPE_GPIO_VIRTUAL, 'GPIO - Virtual'),
+                (TYPE_GPIO, 'GPIO'),
+            )
+        ),
     )
 
     LEGACY_MAP = {
@@ -774,9 +803,10 @@ class InterfaceTypeChoices(ChoiceSet):
         TYPE_SONET_OC12: 6200,
         TYPE_SONET_OC48: 6300,
         TYPE_SONET_OC192: 6400,
-        TYPE_SONET_OC768: 6500,
-        TYPE_SONET_OC1920: 6600,
-        TYPE_SONET_OC3840: 6700,
+# These were used in our modification, if merge brings them back delete them!
+        #TYPE_SONET_OC768: 6500,
+        #TYPE_SONET_OC1920: 6600,
+        #TYPE_SONET_OC3840: 6700,
         TYPE_1GFC_SFP: 3010,
         TYPE_2GFC_SFP: 3020,
         TYPE_4GFC_SFP: 3040,
@@ -807,6 +837,13 @@ class InterfaceTypeChoices(ChoiceSet):
         TYPE_SUMMITSTACK256: 5320,
         TYPE_SUMMITSTACK512: 5330,
         TYPE_OTHER: 32767,
+        TYPE_ANALOGAUDIO: 6000,
+        TYPE_AESAUDIO: 6100,
+        TYPE_MICROPHONE: 6200,
+        TYPE_GPIO_INPUT: 6500,
+        TYPE_GPIO_OUTPUT: 6600,
+        TYPE_GPIO_VIRTUAL: 6700,
+        TYPE_GPIO: 6800,
     }
 
 
@@ -835,8 +872,8 @@ class InterfaceModeChoices(ChoiceSet):
 
 class PortTypeChoices(ChoiceSet):
 
-    TYPE_8P8C = '8p8c'
-    TYPE_110_PUNCH = '110-punch'
+    TYPE_8P8C = '8p8c (RJ45)'
+    TYPE_110_PUNCH = '110 Block Style - Punch'
     TYPE_BNC = 'bnc'
     TYPE_MRJ21 = 'mrj21'
     TYPE_ST = 'st'
@@ -849,15 +886,17 @@ class PortTypeChoices(ChoiceSet):
     TYPE_MPO = 'mpo'
     TYPE_LSH = 'lsh'
     TYPE_LSH_APC = 'lsh-apc'
+    TYPE_SLPUNCH = 'SL Modular Jack'
 
     CHOICES = (
         (
             'Copper',
             (
-                (TYPE_8P8C, '8P8C'),
-                (TYPE_110_PUNCH, '110 Punch'),
+                (TYPE_8P8C, '8P8C (RJ45)'),
+                (TYPE_110_PUNCH, '110 Block Style - Punch'),
                 (TYPE_BNC, 'BNC'),
                 (TYPE_MRJ21, 'MRJ21'),
+                (TYPE_SLPUNCH, 'SL Modular Jack'),
             ),
         ),
         (
@@ -880,7 +919,8 @@ class PortTypeChoices(ChoiceSet):
     LEGACY_MAP = {
         TYPE_8P8C: 1000,
         TYPE_110_PUNCH: 1100,
-        TYPE_BNC: 1200,
+        #no old BNC comment out to match SL punch properly
+        #TYPE_BNC: 1200,
         TYPE_ST: 2000,
         TYPE_SC: 2100,
         TYPE_SC_APC: 2110,
@@ -891,6 +931,7 @@ class PortTypeChoices(ChoiceSet):
         TYPE_MPO: 2500,
         TYPE_LSH: 2600,
         TYPE_LSH_APC: 2610,
+        TYPE_SLPUNCH: 1200,
     }
 
 
