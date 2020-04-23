@@ -4,6 +4,11 @@ from extras.models import ObjectChange
 from utilities.utils import serialize_object
 
 
+__all__ = (
+    'ChangeLoggedModel',
+)
+
+
 class ChangeLoggedModel(models.Model):
     """
     An abstract model which adds fields to store the creation and last-updated times for an object. Both fields can be
@@ -23,15 +28,14 @@ class ChangeLoggedModel(models.Model):
     class Meta:
         abstract = True
 
-    def log_change(self, user, request_id, action):
+    def to_objectchange(self, action):
         """
-        Create a new ObjectChange representing a change made to this object. This will typically be called automatically
+        Return a new ObjectChange representing a change made to this object. This will typically be called automatically
         by extras.middleware.ChangeLoggingMiddleware.
         """
-        ObjectChange(
-            user=user,
-            request_id=request_id,
+        return ObjectChange(
             changed_object=self,
+            object_repr=str(self),
             action=action,
             object_data=serialize_object(self)
-        ).save()
+        )

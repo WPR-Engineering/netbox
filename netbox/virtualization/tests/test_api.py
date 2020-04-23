@@ -2,11 +2,22 @@ from django.urls import reverse
 from netaddr import IPNetwork
 from rest_framework import status
 
-from dcim.constants import IFACE_TYPE_VIRTUAL, IFACE_MODE_TAGGED
+from dcim.choices import InterfaceModeChoices
 from dcim.models import Interface
 from ipam.models import IPAddress, VLAN
-from utilities.testing import APITestCase
+from utilities.testing import APITestCase, disable_warnings
+from virtualization.choices import *
 from virtualization.models import Cluster, ClusterGroup, ClusterType, VirtualMachine
+
+
+class AppTest(APITestCase):
+
+    def test_root(self):
+
+        url = reverse('virtualization-api:api-root')
+        response = self.client.get('{}?format=api'.format(url), **self.header)
+
+        self.assertEqual(response.status_code, 200)
 
 
 class ClusterTypeTest(APITestCase):
@@ -393,7 +404,8 @@ class VirtualMachineTest(APITestCase):
         }
 
         url = reverse('virtualization-api:virtualmachine-list')
-        response = self.client.post(url, data, format='json', **self.header)
+        with disable_warnings('django.request'):
+            response = self.client.post(url, data, format='json', **self.header)
 
         self.assertHttpStatus(response, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(VirtualMachine.objects.count(), 4)
@@ -476,6 +488,18 @@ class VirtualMachineTest(APITestCase):
 
         self.assertFalse('config_context' in response.data['results'][0])
 
+    def test_unique_name_per_cluster_constraint(self):
+
+        data = {
+            'name': 'Test Virtual Machine 1',
+            'cluster': self.cluster1.pk,
+        }
+
+        url = reverse('virtualization-api:virtualmachine-list')
+        response = self.client.post(url, data, format='json', **self.header)
+
+        self.assertHttpStatus(response, status.HTTP_400_BAD_REQUEST)
+
 
 class InterfaceTest(APITestCase):
 
@@ -489,17 +513,17 @@ class InterfaceTest(APITestCase):
         self.interface1 = Interface.objects.create(
             virtual_machine=self.virtualmachine,
             name='Test Interface 1',
-            type=IFACE_TYPE_VIRTUAL
+            type=InterfaceTypeChoices.TYPE_VIRTUAL
         )
         self.interface2 = Interface.objects.create(
             virtual_machine=self.virtualmachine,
             name='Test Interface 2',
-            type=IFACE_TYPE_VIRTUAL
+            type=InterfaceTypeChoices.TYPE_VIRTUAL
         )
         self.interface3 = Interface.objects.create(
             virtual_machine=self.virtualmachine,
             name='Test Interface 3',
-            type=IFACE_TYPE_VIRTUAL
+            type=InterfaceTypeChoices.TYPE_VIRTUAL
         )
 
         self.vlan1 = VLAN.objects.create(name="Test VLAN 1", vid=1)
@@ -551,7 +575,7 @@ class InterfaceTest(APITestCase):
         data = {
             'virtual_machine': self.virtualmachine.pk,
             'name': 'Test Interface 4',
-            'mode': IFACE_MODE_TAGGED,
+            'mode': InterfaceModeChoices.MODE_TAGGED,
             'untagged_vlan': self.vlan3.id,
             'tagged_vlans': [self.vlan1.id, self.vlan2.id],
         }
@@ -598,21 +622,21 @@ class InterfaceTest(APITestCase):
             {
                 'virtual_machine': self.virtualmachine.pk,
                 'name': 'Test Interface 4',
-                'mode': IFACE_MODE_TAGGED,
+                'mode': InterfaceModeChoices.MODE_TAGGED,
                 'untagged_vlan': self.vlan2.id,
                 'tagged_vlans': [self.vlan1.id],
             },
             {
                 'virtual_machine': self.virtualmachine.pk,
                 'name': 'Test Interface 5',
-                'mode': IFACE_MODE_TAGGED,
+                'mode': InterfaceModeChoices.MODE_TAGGED,
                 'untagged_vlan': self.vlan2.id,
                 'tagged_vlans': [self.vlan1.id],
             },
             {
                 'virtual_machine': self.virtualmachine.pk,
                 'name': 'Test Interface 6',
-                'mode': IFACE_MODE_TAGGED,
+                'mode': InterfaceModeChoices.MODE_TAGGED,
                 'untagged_vlan': self.vlan2.id,
                 'tagged_vlans': [self.vlan1.id],
             },
